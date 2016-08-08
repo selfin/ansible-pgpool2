@@ -1,0 +1,9 @@
+---
+- name: reload pgpool2
+  service: name=pgpool2 state=restarted
+
+- name: start pgpool2
+  service: name=pgpool2 state=started enabled=yes
+
+- name: stop pgpool2
+  service: name=pgpool2 state=stopped

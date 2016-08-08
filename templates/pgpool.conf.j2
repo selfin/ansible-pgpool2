@@ -1,0 +1,272 @@
+#------------------------------------------------------------------------------
+# CONNECTIONS
+#------------------------------------------------------------------------------
+
+# - pgpool Connection Settings -
+
+listen_addresses = '*'
+port = 5432
+socket_dir = '/var/run/postgresql'
+# - pgpool Communication Manager Connection Settings -
+
+pcp_port = 9898
+pcp_socket_dir = '/var/run/postgresql'
+
+{% for host in groups[pg_replication_group] %}
+backend_hostname{{ host[-1::]|int - 1  }} = '{{hostvars[host]['ansible_ens18']['ipv4']['address'] }}'
+backend_port{{ host[-1::]|int - 1  }} = {{ pg_port }}
+backend_weight{{ host[-1::]|int - 1  }} = 1
+backend_data_directory{{ host[-1::]|int - 1  }} = '/var/lib/postgresql/{{ pg_version }}/main/'
+backend_flag{{ host[-1::]|int - 1  }} = 'ALLOW_TO_FAILOVER'
+{% endfor %}
+
+
+# - Authentication -
+enable_pool_hba = off
+authentication_timeout = 60
+
+# - SSL Connections -
+ssl = off
+
+#------------------------------------------------------------------------------
+# POOLS
+#------------------------------------------------------------------------------
+
+# - Pool size -
+
+num_init_children = 32
+max_pool = 4
+child_life_time = 300
+child_max_connections = 0
+connection_life_time = 0
+client_idle_limit = 0
+
+#------------------------------------------------------------------------------
+# LOGS
+#------------------------------------------------------------------------------
+
+# - Where to log -
+
+log_destination = 'syslog'
+
+# - What to log -
+print_timestamp = on
+log_connections = off
+log_hostname = off
+log_statement = off
+log_per_node_statement = off
+log_standby_delay = 'if_over_threshold'
+
+# - Syslog specific -
+syslog_facility = 'LOCAL0'
+syslog_ident = 'pgpool'
+# - Debug -
+debug_level = 3
+log_error_verbosity = verbose
+
+#------------------------------------------------------------------------------
+# FILE LOCATIONS
+#------------------------------------------------------------------------------
+
+pid_file_name = '/var/run/postgresql/pgpool.pid'
+                                   # PID file name
+                                   # (change requires restart)
+logdir = '/var/log/postgresql'
+                                   # Directory of pgPool status file
+                                   # (change requires restart)
+
+
+#------------------------------------------------------------------------------
+# CONNECTION POOLING
+#------------------------------------------------------------------------------
+
+connection_cache = on
+reset_query_list = 'ABORT; DISCARD ALL'
+#reset_query_list = 'ABORT; RESET ALL; SET SESSION AUTHORIZATION DEFAULT'
+
+#------------------------------------------------------------------------------
+# REPLICATION MODE
+#------------------------------------------------------------------------------
+replication_mode = off
+replicate_select = off
+insert_lock = off
+lobj_lock_table = ''
+replication_stop_on_mismatch = off
+failover_if_affected_tuples_mismatch = off
+#------------------------------------------------------------------------------
+# LOAD BALANCING MODE
+#------------------------------------------------------------------------------
+load_balance_mode = on
+ignore_leading_white_space = on
+white_function_list = ''
+black_function_list = 'currval,lastval,nextval,setval'
+#------------------------------------------------------------------------------
+# MASTER/SLAVE MODE
+#------------------------------------------------------------------------------
+master_slave_mode = on
+master_slave_sub_mode = 'stream'
+# - Streaming -
+sr_check_period = 1
+sr_check_user = '{{ repmgr_user }}'
+sr_check_password = '{{ repmgr_pass }}'
+delay_threshold = 10000000
+# - Special commands -
+follow_master_command = '/opt/postgressc/followmaster.sh %h %H '
+#follow_master_command = '/usr/bin/repmgr -h %H -p {{ pg_port }} -D /var/lib/postgresql/{{ pg_version }}/main/ -d repmgr -U repmgr -R postgres standby follow'
+                                   # Executes this command after master failover
+                                   # Special values:
+                                   #   %d = node id
+                                   #   %h = host name
+                                   #   %p = port number
+                                   #   %D = database cluster path
+                                   #   %m = new master node id
+                                   #   %H = hostname of the new master node
+                                   #   %M = old master node id
+                                   #   %P = old primary node id
+                                   #   %% = '%' character
+
+
+#------------------------------------------------------------------------------
+# PARALLEL MODE AND QUERY CACHE
+#------------------------------------------------------------------------------
+
+parallel_mode = off
+enable_query_cache = off
+pgpool2_hostname = '{{ ansible_hostname }}'
+
+# - System DB info -
+system_db_hostname  = '{{ ansible_hostname }}'
+system_db_port = 5432
+system_db_dbname = 'pgpool'
+system_db_schema = 'pgpool_catalog'
+system_db_user = 'pgpool'
+system_db_password = ''
+#------------------------------------------------------------------------------
+# HEALTH CHECK
+#------------------------------------------------------------------------------
+health_check_period = 5
+health_check_timeout = 5
+health_check_user = '{{ repmgr_user }}'
+health_check_password = '{{ repmgr_pass }}'
+#------------------------------------------------------------------------------
+# FAILOVER AND FAILBACK
+#------------------------------------------------------------------------------
+#failover_command = 'repmgr -f /etc/repmgr.conf standby promote'
+failover_command = '/opt/postgressc/failover.sh %d %P %H'
+                                   # Executes this command at failover
+                                   # Special values:
+                                   #   %d = node id
+                                   #   %h = host name
+                                   #   %p = port number
+                                   #   %D = database cluster path
+                                   #   %m = new master node id
+                                   #   %H = hostname of the new master node
+                                   #   %M = old master node id
+                                   #   %P = old primary node id
+                                   #   %% = '%' character
+#failback_command = '/bin/rm -f /var/log/pgpool/trigger/trigger_file1'
+failback_command = '/opt/postgressc/followmaster.sh %h %H'
+                                   # Executes this command at failback.
+                                   # Special values:
+                                   #   %d = node id
+                                   #   %h = host name
+                                   #   %p = port number
+                                   #   %D = database cluster path
+                                   #   %m = new master node id
+                                   #   %H = hostname of the new master node
+                                   #   %M = old master node id
+                                   #   %P = old primary node id
+                                   #   %% = '%' character
+
+#fail_over_on_backend_error = on
+                                   # Initiates failover when writing to the
+                                   # backend communication socket fails
+                                   # This is the same behaviour of pgpool-II
+                                   # 2.2.x and previous releases
+                                   # If set to off, pgpool will report an
+                                   # error and disconnect the session.
+
+
+#------------------------------------------------------------------------------
+# ONLINE RECOVERY
+#------------------------------------------------------------------------------
+recovery_user = 'postgres'
+recovery_password = 'pgpoolAdmin'
+recovery_1st_stage_command = 'basebackup.sh'
+recovery_2nd_stage_command = ''
+recovery_timeout = 90
+client_idle_limit_in_recovery = 0
+                                   # Client is disconnected after being idle
+                                   # for that many seconds in the second stage
+                                   # of online recovery
+                                   # 0 means no disconnection
+                                   # -1 means immediate disconnection
+
+#---------------------------------
+# OTHERS
+#------------------------------------------------------------------------------
+relcache_expire = 0
+                                   # Life time of relation cache in seconds.
+                                   # 0 means no cache expiration(the default).
+                                   # The relation cache is used for cache the
+                                   # query result against PostgreSQL system
+                                   # catalog to obtain various information
+                                   # including table structures or if it's a
+                                   # temporary table or not. The cache is
+                                   # maintained in a pgpool child local memory
+                                   # and being kept as long as it survives.
+                                   # If someone modify the table by using
+                                   # ALTER TABLE or some such, the relcache is
+                                   # not consistent anymore.
+                                   # For this purpose, cache_expiration
+                                   # controls the life time of the cache.
+
+
+#------------------------------------------------------------------------------
+# WATCHDOG
+#------------------------------------------------------------------------------
+# - Enabling -
+use_watchdog = on
+# -Connection to up stream servers -
+trusted_servers = '10.0.21.1 10.0.2.2 8.8.8.8'
+ping_path = '/bin'
+wd_hostname = '{{hostvars[ansible_hostname]['ansible_ens18']['ipv4']['address'] }}'
+wd_port = 9000
+wd_authkey = 'waegt2tq#GRSZCASDVG13'
+
+wd_heartbeat_keepalive = 2
+wd_heartbeat_deadtime = 10
+wd_heartbeat_port = 9694
+wd_lifecheck_method = 'heartbeat'
+wd_interval = 3
+
+delegate_IP = '{{ pgpool_VIP }}'
+ifconfig_path = '/sbin'
+if_up_cmd = 'ifconfig ens18:0 inet {{ pgpool_VIP }} netmask 255.255.255.0'
+if_down_cmd = 'ifconfig ens18:0 down'
+arping_path = '/usr/bin'
+arping_cmd = 'arping -I ens18 -U {{ pgpool_VIP }} -c 3 -w 5'
+
+{% set number = 0 %}
+{% for host in groups[pg_replication_group] %}
+
+{% if host != ansible_hostname %}
+
+
+heartbeat_destination{{ number }} = '{{hostvars[host]['ansible_ens18']['ipv4']['address'] }}'
+heartbeat_destination_port{{ number }} = 9694
+
+other_pgpool_hostname{{ number }} = '{{hostvars[host]['ansible_ens18']['ipv4']['address'] }}'
+other_pgpool_port{{ number }} = 5432
+other_wd_port{{ number }}  = 9000
+{% set number = number|int +1 %}
+
+#heartbeat_destination{{ host[-1::]|int - 1  }} = '{{hostvars[host]['ansible_ens18']['ipv4']['address'] }}'
+#heartbeat_destination_port{{ host[-1::]|int - 1  }} = 9694
+#heartbeat_device{{ host[-1::]|int - 1  }} = 'ens18'
+
+#other_pgpool_hostname{{ host[-1::]|int - 1  }} = '{{hostvars[host]['ansible_ens18']['ipv4']['address'] }}'
+#other_pgpool_port{{ host[-1::]|int - 1  }} = 5432
+#other_wd_port{{ host[-1::]|int - 1  }}  = 9000
+{%endif%}
+{% endfor %}

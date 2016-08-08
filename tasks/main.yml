@@ -1,0 +1,25 @@
+---
+- include_vars: ../../postgresql/defaults/main.yml
+- apt: pkg=arping state=removed
+- apt: pkg={{ item }} state=latest update_cache=yes
+  with_items:
+    - postgresql-{{pg_version}}-pgpool2
+    - pgpool2
+    - iputils-arping
+
+- command: cp /etc/pgpool2/pgpool.conf /etc/pgpool2/pgpool.conf.orig creates=/etc/pgpool2/pgpool.conf.orig
+
+- file: dest=/sbin/ifconfig mode='u+s'
+- file: dest=/bin/ping mode='u+s'
+#- file: dest=/usr/bin/arping mode='u+s'
+- file: dest=/opt/postgressc/ state=directory owner=postgres group=postgres mode=0774
+- template: src=failover.sh dest=/opt/postgressc/failover.sh owner=postgres group=postgres mode=0774
+- template: src=followmaster.sh dest=/opt/postgressc/followmaster.sh owner=postgres group=postgres mode=0774
+- template: src=pgpool.conf.j2 dest=/etc/pgpool2/pgpool.conf
+  notify: reload pgpool2
+
+- template: src=pool_hba.conf.j2 dest=/etc/pgpool2/pool_hba.conf
+  notify: reload pgpool2
+
+- template: src=pcp.conf.j2 dest=/etc/pgpool2/pcp.conf
+  notify: reload pgpool2
